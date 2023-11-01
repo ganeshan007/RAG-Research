@@ -40,6 +40,7 @@ def main():
                 current_data = pd.read_csv(file_path)
                 data = pd.concat([data, current_data], ignore_index=True)
         print(f'Loaded {args.data_name} data')
+        
         if args.num_test!=-1:
             rand_indices = np.random.choice(len(data), args.num_test, replace=False)
             test_data = data.iloc[list(rand_indices)]
