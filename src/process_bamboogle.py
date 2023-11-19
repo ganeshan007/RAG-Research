@@ -1,4 +1,5 @@
 import os
+
 # import openai
 import numpy as np
 import pandas as pd
@@ -6,32 +7,40 @@ import argparse
 from typing import Optional
 from transformers import pipeline, set_seed
 
+
 def load_opt_model():
     set_seed(32)
-    generator = pipeline('text-generation', model="facebook/opt-1.3b", do_sample=True)
+    generator = pipeline("text-generation", model="facebook/opt-1.3b", do_sample=True)
     return generator
 
+
 def get_answers(generator, prompt, context: Optional[str] = None):
-    if context: prompt = f"{prompt}. You are given the context {context}\n"
+    if context:
+        prompt = f"{prompt}. You are given the context {context}\n"
     ans = generator(prompt)
     return ans
 
-
-
+def tokenize(a):
+    """
+    lower, split, strip each token
+    """
+    b = a.lower().split()
+    for ii in range(len(b)):
+        b[ii] = b[ii].strip().strip('?.,\"\'').strip()
+    return b
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_name', type=str, required=True, default='bamboogle')
-    parser.add_argument('--data_dir', type=str, required=True, default='../Data')
-    parser.add_argument('--num_test', type=int, required=True, default=-1)
-    parser.add_argument('--use_open_ai', type=bool, required=False, default=False)
-    parser.add_argument('--use_opt_model', type=bool, required=False, default=True)
-
-
+    parser.add_argument("--data_name", type=str, required=True, default="bamboogle")
+    parser.add_argument("--data_dir", type=str, required=True, default="../Data")
+    parser.add_argument("--num_test", type=int, required=True, default=-1)
+    parser.add_argument("--use_open_ai", type=bool, required=False, default=False)
+    parser.add_argument("--get_predictions", type=bool, required=True, default=False)
+    parser.add_argument("--use_opt_model", type=bool, required=False, default=True)
 
     args = parser.parse_args()
-    if args.data_name == 'bamboogle':
+    if args.data_name == "bamboogle" and args.get_predictions:
         if args.data_dir:
             file_names = os.listdir(args.data_dir)
             data = pd.DataFrame()
@@ -39,9 +48,9 @@ def main():
                 file_path = os.path.join(args.data_dir, file)
                 current_data = pd.read_csv(file_path)
                 data = pd.concat([data, current_data], ignore_index=True)
-        print(f'Loaded {args.data_name} data')
-        
-        if args.num_test!=-1:
+        print(f"Loaded {args.data_name} data")
+
+        if args.num_test != -1:
             rand_indices = np.random.choice(len(data), args.num_test, replace=False)
             test_data = data.iloc[list(rand_indices)]
             train_data = data.drop(list(rand_indices))
@@ -50,20 +59,49 @@ def main():
             test_data = data
         if args.use_opt_model:
             generator = load_opt_model()
-            train_data['PredictedAnswer'] = train_data['Questions'].apply(lambda row: get_answers(generator, row))
+            train_data["PredictedAnswer"] = train_data["Questions"].apply(
+                lambda row: get_answers(generator, row)
+            )
             print(f"Finished processing Train {args.data_name}")
-            test_data['PredictedAnswer'] = test_data['Questions'].apply(lambda row: get_answers(generator, row))
+            test_data["PredictedAnswer"] = test_data["Questions"].apply(
+                lambda row: get_answers(generator, row)
+            )
             print(f"Finished processing Test {args.data_name}")
             print(f"Saving Outputs...")
-            test_data.to_csv(os.path.join(args.data_dir,f'predicted_test_data_{args.data_name}.csv'))
-            train_data.to_csv(os.path.join(args.data_dir, f"predicted_train_data_{args.data_name}.csv"))
+            test_data.to_csv(
+                os.path.join(args.data_dir, f"predicted_test_data_{args.data_name}.csv")
+            )
+            train_data.to_csv(
+                os.path.join(
+                    args.data_dir, f"predicted_train_data_{args.data_name}.csv"
+                )
+            )
+
+        if args.get_eval_results:
+            F1_list = []
+            InterRecall_list = []
+
+            if os.path.exists(
+                os.path.join(args.data_dir, f"predicted_test_data_{args.data_name}.csv")):
+                data = pd.read_csv(os.path.join(args.data_dir, f"predicted_test_data_{args.data_name}.csv"))
+                data['PredictedAnswer'] = data['PredictedAnswer'].str.strip().lower()
+                for i, current_data in data.iterrows():
+                    output_w = set(tokenize(current_data['PredictedAnswer']))
+                    target_w = set(tokenize(current_data['Answer']))
+                    num_share_w = len(output_w & target_w)
+                    if num_share_w == 0:
+                        f1 = 0
+                    else:
+                        precision = num_share_w / len(output_w)
+                        recall = num_share_w / len(target_w)
+                        f1 = 2 * precision * recall / (precision + recall)
+                    F1_list.append(f1)
+
+            assert len(F1_list) != 0, "F1 list is empty"
+            print(f"F1 score is {np.mean(F1_list)}")
+                
 
 
 
-
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-
