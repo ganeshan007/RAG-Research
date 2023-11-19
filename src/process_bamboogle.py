@@ -42,8 +42,8 @@ def main():
     parser.add_argument("--data_dir", type=str, required=True, default="./Data")
     parser.add_argument("--num_test", type=int, required=True, default=-1)
     parser.add_argument("--use_open_ai", type=bool, required=False, default=False)
-    parser.add_argument("--get_predictions", type=bool, required=True, default=False)
-    parser.add_argument("--get_eval_results", type=bool, required=False, default=False)
+    parser.add_argument("--get_predictions", type=bool, required=False, default=False, action="store_true")
+    parser.add_argument("--get_eval_results", type=bool, required=False, default=False, action="store_true")
     parser.add_argument("--use_opt_model", type=bool, required=False, default=True)
 
     args = parser.parse_args()
