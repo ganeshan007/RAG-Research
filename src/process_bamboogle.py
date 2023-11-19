@@ -42,8 +42,8 @@ def main():
     parser.add_argument("--data_dir", type=str, required=True, default="./Data")
     parser.add_argument("--num_test", type=int, required=True, default=-1)
     parser.add_argument("--use_open_ai", type=bool, required=False, default=False)
-    parser.add_argument("--get_predictions", type=bool, required=False, default=False, action="store_true")
-    parser.add_argument("--get_eval_results", type=bool, required=False, default=False, action="store_true")
+    parser.add_argument("--get_predictions", dest='get_predictions', action="store_true")
+    parser.add_argument("--get_eval_results", dest='get_eval_results',action="store_true")
     parser.add_argument("--use_opt_model", type=bool, required=False, default=True)
 
     args = parser.parse_args()
@@ -84,28 +84,30 @@ def main():
                 )
             )
 
-        if args.get_eval_results:
-            F1_list = []
-            InterRecall_list = []
+    if args.get_eval_results:
+        F1_list = []
+        InterRecall_list = []
 
-            if os.path.exists(
-                os.path.join(args.data_dir, f"predicted_test_data_{args.data_name}.csv")):
-                data = pd.read_csv(os.path.join(args.data_dir, f"predicted_test_data_{args.data_name}.csv"))
-                data['PredictedAnswer'] = data['PredictedAnswer'].apply(lambda x: literal_eval(x))
-                for i, current_data in data.iterrows():
-                    output_w = set(tokenize(current_data['PredictedAnswer'][0]['generated_text']))
-                    target_w = set(tokenize(current_data['Answer']))
-                    num_share_w = len(output_w & target_w)
-                    if num_share_w == 0:
-                        f1 = 0
-                    else:
-                        precision = num_share_w / len(output_w)
-                        recall = num_share_w / len(target_w)
-                        f1 = 2 * precision * recall / (precision + recall)
-                    F1_list.append(f1)
+        if os.path.exists(
+            os.path.join(args.data_dir, f"predicted_test_data_{args.data_name}.csv")):
+            data_test = pd.read_csv(os.path.join(args.data_dir, f"predicted_test_data_{args.data_name}.csv"))
+            data_train = pd.read_csv(os.path.join(args.data_dir, f"predicted_train_data_{args.data_name}.csv"))
+            data = pd.concat([data_test, data_train], ignore_index=True).reset_index()
+            data['PredictedAnswer'] = data['PredictedAnswer'].apply(lambda x: literal_eval(x))
+            for i, current_data in data.iterrows():
+                output_w = set(tokenize(current_data['PredictedAnswer'][0]['generated_text']))
+                target_w = set(tokenize(current_data['Answer']))
+                num_share_w = len(output_w & target_w)
+                if num_share_w == 0:
+                    f1 = 0
+                else:
+                    precision = num_share_w / len(output_w)
+                    recall = num_share_w / len(target_w)
+                    f1 = 2 * precision * recall / (precision + recall)
+                F1_list.append(f1)
 
-            assert len(F1_list) != 0, "F1 list is empty"
-            print(f"F1 score is {np.mean(F1_list)}")
+        assert len(F1_list) != 0, "F1 list is empty"
+        print(f"F1 score :::: {np.mean(F1_list)}")
                 
 
 
