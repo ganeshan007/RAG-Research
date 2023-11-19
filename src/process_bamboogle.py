@@ -20,6 +20,14 @@ def load_opt_model(load_optimized:bool = True):
     return generator
 
 
+def load_gpt2_model(load_optimized:bool = True):
+    set_seed(32)
+    if load_optimized:
+        generator = pipeline("text-generation", model="gpt2", do_sample=True, return_full_text=False, torch_dtype=torch.bfloat16, max_length=40)
+    else:
+        generator = pipeline("text-generation", model="gpt2", do_sample=True, return_full_text=False, max_length=40)
+    return generator
+
 def get_answers(generator, prompt, context: Optional[str] = None):
     if context:
         prompt = f"{prompt}. You are given the context {context}\n"
@@ -44,7 +52,8 @@ def main():
     parser.add_argument("--use_open_ai", type=bool, required=False, default=False)
     parser.add_argument("--get_predictions", dest='get_predictions', action="store_true")
     parser.add_argument("--get_eval_results", dest='get_eval_results',action="store_true")
-    parser.add_argument("--use_opt_model", type=bool, required=False, default=True)
+    parser.add_argument("--use_opt_model",dest='get_eval_results',action="store_true")
+    parser.add_argument("--model_name", dest='model_name', choices=['opt', 'gpt'])
 
     args = parser.parse_args()
     if args.data_name == "bamboogle" and args.get_predictions:
@@ -64,25 +73,28 @@ def main():
             print(f"Number of samples in Test Data: {len(test_data)}, Number of samples in Train data{len(train_data)}")
         else:
             test_data = data
-        if args.use_opt_model:
-            generator = load_opt_model()
-            train_data["PredictedAnswer"] = train_data["Question"].progress_apply(
-                lambda row: get_answers(generator, row)
+        load_optimized = False
+        if args.model_name=='opt':
+            generator = load_opt_model(load_optimized)
+        if args.model_name=='gpt':
+            generator = load_gpt2_model(load_optimized)
+        train_data["PredictedAnswer"] = train_data["Question"].progress_apply(
+            lambda row: get_answers(generator, row)
+        )
+        print(f"Finished processing Train {args.data_name}")
+        test_data["PredictedAnswer"] = test_data["Question"].progress_apply(
+            lambda row: get_answers(generator, row)
+        )
+        print(f"Finished processing Test {args.data_name}")
+        print(f"Saving Outputs...")
+        test_data.to_csv(
+            os.path.join(args.data_dir, f"predicted_test_data_{args.data_name}.csv")
+        )
+        train_data.to_csv(
+            os.path.join(
+                args.data_dir, f"predicted_train_data_{args.data_name}.csv"
             )
-            print(f"Finished processing Train {args.data_name}")
-            test_data["PredictedAnswer"] = test_data["Question"].progress_apply(
-                lambda row: get_answers(generator, row)
-            )
-            print(f"Finished processing Test {args.data_name}")
-            print(f"Saving Outputs...")
-            test_data.to_csv(
-                os.path.join(args.data_dir, f"predicted_test_data_{args.data_name}.csv")
-            )
-            train_data.to_csv(
-                os.path.join(
-                    args.data_dir, f"predicted_train_data_{args.data_name}.csv"
-                )
-            )
+        )
 
     if args.get_eval_results:
         F1_list = []
