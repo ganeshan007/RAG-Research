@@ -1,16 +1,22 @@
 import os
 
 # import openai
+import torch
 import numpy as np
 import pandas as pd
 import argparse
 from typing import Optional
+from tqdm import tqdm
 from transformers import pipeline, set_seed
 
+tqdm.pandas()
 
-def load_opt_model():
+def load_opt_model(load_optimized:bool = True):
     set_seed(32)
-    generator = pipeline("text-generation", model="facebook/opt-1.3b", do_sample=True)
+    if load_optimized:
+        generator = pipeline("text-generation", model="facebook/opt-1.3b", do_sample=True, return_full_text=False, torch_dtype=torch.bfloat16, max_length=40)
+    else:
+        generator = pipeline("text-generation", model="facebook/opt-1.3b", do_sample=True, return_full_text=False, max_length=40)
     return generator
 
 
@@ -33,10 +39,11 @@ def tokenize(a):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_name", type=str, required=True, default="bamboogle")
-    parser.add_argument("--data_dir", type=str, required=True, default="../Data")
+    parser.add_argument("--data_dir", type=str, required=True, default="./Data")
     parser.add_argument("--num_test", type=int, required=True, default=-1)
     parser.add_argument("--use_open_ai", type=bool, required=False, default=False)
     parser.add_argument("--get_predictions", type=bool, required=True, default=False)
+    parser.add_argument("--get_eval_results", type=bool, required=False, default=False)
     parser.add_argument("--use_opt_model", type=bool, required=False, default=True)
 
     args = parser.parse_args()
@@ -54,16 +61,16 @@ def main():
             rand_indices = np.random.choice(len(data), args.num_test, replace=False)
             test_data = data.iloc[list(rand_indices)]
             train_data = data.drop(list(rand_indices))
-            print(len(test_data), len(train_data))
+            print(f"Number of samples in Test Data: {len(test_data)}, Number of samples in Train data{len(train_data)}")
         else:
             test_data = data
         if args.use_opt_model:
             generator = load_opt_model()
-            train_data["PredictedAnswer"] = train_data["Questions"].apply(
+            train_data["PredictedAnswer"] = train_data["Question"].progress_apply(
                 lambda row: get_answers(generator, row)
             )
             print(f"Finished processing Train {args.data_name}")
-            test_data["PredictedAnswer"] = test_data["Questions"].apply(
+            test_data["PredictedAnswer"] = test_data["Question"].progress_apply(
                 lambda row: get_answers(generator, row)
             )
             print(f"Finished processing Test {args.data_name}")
