@@ -1,5 +1,5 @@
 import os
-
+from ast import literal_eval
 # import openai
 import torch
 import numpy as np
@@ -91,9 +91,9 @@ def main():
             if os.path.exists(
                 os.path.join(args.data_dir, f"predicted_test_data_{args.data_name}.csv")):
                 data = pd.read_csv(os.path.join(args.data_dir, f"predicted_test_data_{args.data_name}.csv"))
-                data['PredictedAnswer'] = data['PredictedAnswer'].str.strip().lower()
+                data['PredictedAnswer'] = data['PredictedAnswer'].apply(lambda x: literal_eval(x))
                 for i, current_data in data.iterrows():
-                    output_w = set(tokenize(current_data['PredictedAnswer']))
+                    output_w = set(tokenize(current_data['PredictedAnswer'][0]['generated_text']))
                     target_w = set(tokenize(current_data['Answer']))
                     num_share_w = len(output_w & target_w)
                     if num_share_w == 0:
