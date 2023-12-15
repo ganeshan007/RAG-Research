@@ -13,6 +13,28 @@ from transformers import pipeline, set_seed
 tqdm.pandas()
 
 
+def load_openLlama_model(load_optimized: bool = True):
+    set_seed(32)
+    if load_optimized:
+        generator = pipeline(
+            "text-generation",
+            model="openlm-research/open_llama_3b_v2",
+            do_sample=True,
+            return_full_text=False,
+            torch_dtype=torch.bfloat16,
+            max_length=40,
+        )
+    else:
+        generator = pipeline(
+            "text-generation",
+            model="openlm-research/open_llama_3b_v2",
+            do_sample=True,
+            return_full_text=False,
+            max_length=40,
+        )
+    return generator
+
+
 def load_opt_model(load_optimized: bool = True):
     set_seed(32)
     if load_optimized:
@@ -106,7 +128,9 @@ def main():
     parser.add_argument(
         "--use_few_shot_prompt", dest="use_few_shot_prompt", action="store_true"
     )
-    parser.add_argument("--model_name", dest="model_name", choices=["opt", "gpt"])
+    parser.add_argument(
+        "--model_name", dest="model_name", choices=["opt", "gpt", "openLlama"]
+    )
 
     args = parser.parse_args()
     if args.data_name == "bamboogle" and args.get_predictions:
@@ -133,6 +157,8 @@ def main():
             generator = load_opt_model(load_optimized)
         if args.model_name == "gpt":
             generator = load_gpt2_model(load_optimized)
+        if args.model_name == "openLlama":
+            generator = load_openLlama_model(load_optimized)
         train_data["PredictedAnswer"] = train_data["Question"].progress_apply(
             lambda row: get_answers(generator, row)
         )
